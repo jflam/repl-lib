@@ -11,6 +11,7 @@ using IronRuby.Builtins;
 
 namespace Core {
     public partial class Repl : UserControl {
+        private Dictionary<Type, bool> _viewers = new Dictionary<Type, bool>();
         private Dictionary<string, DlrEngine> _languageMap = new Dictionary<string, DlrEngine>();
         private string _currentEngine;
         private DlrEngine _rubyEngine; // always need a reference to this for our output rendering extensions
@@ -25,6 +26,8 @@ namespace Core {
             InitializeScriptEngines();
             InitializePlugins();
         }
+
+        #region Component initialization 
 
         private void LoadResources() {
             // TODO: load embedded ReplResources.xaml and write to disk if we don't have one in our current dir
@@ -46,33 +49,6 @@ namespace Core {
             _currentEngine = "ruby";
         }
 
-        private void InsertTextBlock(List<Run> runs) {
-            var block = new TextBlock();
-            block.Inlines.AddRange(runs);
-            
-            var pos = MainRepl.CaretPosition.Paragraph;
-            pos.Inlines.Add(new LineBreak());
-            pos.Inlines.AddRange(runs);
-        }
-
-        private void InsertColorizedCode(string code) {
-            InsertTextBlock(Colorizer.Colorize(CurrentEngine, code, null));
-        }
-
-        private void RenderError(string error) {
-            InsertTextBlock(Colorizer.ColorizeErrors(error));
-        }
-
-        private void RenderInput(string code) {
-            var pos = MainRepl.CaretPosition.Paragraph;
-            var selected_text = MainRepl.Selection.Text;
-            MainRepl.Selection.Text = String.Empty;
-            var blocks = Colorizer.Colorize(CurrentEngine, code, null);
-            pos.Inlines.AddRange(blocks);
-        }
-
-        private Dictionary<Type, bool> _viewers = new Dictionary<Type, bool>();
-
         private void LoadInspector(object obj) {
             if (obj != null) {
                 var type = obj.GetType();
@@ -90,29 +66,28 @@ namespace Core {
             }
         }
 
-        public void InsertInspectedResult(object obj) {
-            LoadInspector(obj);
-            object result = _rubyEngine.InvokeMember(obj, "as_xaml");
-            if (result is MutableString) {
-                InsertColorizedCode(result.ToString());
-            } else {
-                MainRepl.CaretPosition.Paragraph.Inlines.Add((UIElement)result);
-            }
-        }
+        #endregion 
 
-        public void AddExternalObject(string name, object obj) {
-            CurrentEngine.SetVariable(name, obj);
-        }
+        #region deprecated code
 
-        private void RenderOutput(object result) {
-            var output = CurrentEngine.ReadStandardOutput();
-            if (output != null)
-                InsertColorizedCode(output.TrimEnd());
-            InsertInspectedResult(result);
-        }
+        //private void InsertTextBlock(List<Run> runs) {
+        //    var block = new TextBlock();
+        //    block.Inlines.AddRange(runs);
 
-        private void RenderCode(TextRange selection, string code) {
-        }
+        //    var pos = MainRepl.CaretPosition.Paragraph;
+        //    pos.Inlines.Add(new LineBreak());
+        //    pos.Inlines.AddRange(runs);
+        //}
+
+        //private void RenderInput(string code) {
+        //    var pos = MainRepl.CaretPosition.Paragraph;
+        //    var selected_text = MainRepl.Selection.Text;
+        //    MainRepl.Selection.Text = String.Empty;
+        //    var blocks = Colorizer.Colorize(CurrentEngine, code, null);
+        //    pos.Inlines.AddRange(blocks);
+        //}
+
+        #endregion
 
         private object Execute(string code) {
             if (code.StartsWith("%")) {
@@ -121,56 +96,142 @@ namespace Core {
                 if (_languageMap.ContainsKey(language)) {
                     _currentEngine = language;
                 } else {
-                    RenderOutput("uh oh - don't know that language");
+                    // TODO: throw from here - not the right place to side-effect
+                    //RenderOutput("uh oh - don't know that language");
                 }
-                return null;
+                return "Switched to " + language;
             } else {
                 return CurrentEngine.Execute(code);
             }
         }
 
+        private Run GetRunUnderPosition(TextPointer position) {
+            var result = position.Parent as Run;
+            if (result == null)
+                throw new ApplicationException("text pointer is not pointing to a Run??!!");
+            return result;
+        }
+
+        private Paragraph GetParagraph(Inline run) {
+            var paragraph = run.Parent as Paragraph;
+            if (paragraph == null)
+                throw new ApplicationException("is it possible for a Run to not have a Paragraph as a perent??");
+            return paragraph;
+        }
+
+        private Inline InsertInline(Inline position, Inline element) {
+            var paragraph = GetParagraph(position);
+            paragraph.Inlines.InsertAfter(position, element);
+            return element;
+        }
+
+        private Inline InsertLineBreak(Inline position) {
+            return InsertInline(position, new LineBreak());
+        }
+
+        private Inline InsertElements(Inline position, List<Run> runs) {
+            var paragraph = GetParagraph(position);
+            var end = runs[runs.Count - 1];
+            for (int i = runs.Count - 1; i >= 0; i--) {
+                paragraph.Inlines.InsertAfter(position, runs[i]);
+            }
+            return end;
+        }
+
+        private Inline InsertColorizedCode(Inline run, string code) {
+            return InsertElements(run, Colorizer.Colorize(CurrentEngine, code, null));
+        }
+
+        private Inline RenderError(Inline run, string error) {
+            return InsertElements(run, Colorizer.ColorizeErrors(error));
+        }
+
+        private Inline ColorizeSelection(TextRange selection) {
+            var position = GetRunUnderPosition(selection.End);
+            var code = selection.Text;
+            return InsertColorizedCode(position, code);
+        }
+
+        public Inline InsertInspectedResult(Inline position, object obj) {
+            LoadInspector(obj);
+            object result = _rubyEngine.InvokeMember(obj, "as_xaml");
+            if (result is MutableString) {
+                return InsertColorizedCode(position, result.ToString());
+            } else {
+                throw new NotImplementedError("do not have mechanism to insert UIElement in middle of flow document yet");
+            }
+        }
+
+        private Inline RenderOutput(Inline position, object result) {
+            var output = CurrentEngine.ReadStandardOutput();
+            return output != null ? InsertColorizedCode(position, output.TrimEnd())
+                                  : InsertInspectedResult(position, result);
+        }
+
         private void MainRepl_PreviewKeyDown(object sender, KeyEventArgs args) {
             if (args.IsCtrl(Key.E)) {
-                try {
-                    var code = MainRepl.Selection.Text;
-                    RenderInput(code);
-                    RenderOutput(Execute(code));
-                    args.Handled = true;
-                } catch (Exception e) {
-                    RenderError(e.Message);
-                }
+                RunSelection(MainRepl.Selection);
+                args.Handled = true;
             } else if (Keyboard.Modifiers == ModifierKeys.None && args.Key == Key.Return) {
-                if (!MainRepl.CaretPosition.IsAtLineStartPosition) {
-                    var pos = MainRepl.CaretPosition.InsertLineBreak();
-                    MainRepl.CaretPosition = pos.GetNextContextPosition(LogicalDirection.Forward);
-                    args.Handled = true;
-                } else {
-                    // remove the last line break in the paragraph's inlines collection
-                    var current_run = MainRepl.CaretPosition.Parent as Run;
-                    if (current_run != null) {
-                        var last_line_break = ((Run)current_run).PreviousInline;
-                        MainRepl.CaretPosition.Paragraph.Inlines.Remove(last_line_break);
-                    }
-                    MainRepl.CaretPosition.InsertParagraphBreak();
-                }
-            } else if (Keyboard.Modifiers == ModifierKeys.Control && args.Key == Key.S) {
+                InsertSmartLineBreak();
+                args.Handled = true;
+            } else if (args.IsCtrl(Key.S)) {
                 using (var stream = File.OpenWrite(@"c:\temp\output.xml")) {
                     XamlWriter.Save(MainRepl.Document, stream);
                 }
-            } else if (Keyboard.Modifiers == ModifierKeys.Control && args.Key == Key.Return) {
-                var selection = new TextRange(MainRepl.CaretPosition.GetLineStartPosition(0), MainRepl.CaretPosition);
-                var code = selection.Text;
-                // TODO: replace the selection with formatted code
-                RenderOutput(Execute(code));
-            } else if (Keyboard.Modifiers == ModifierKeys.Control && args.Key == Key.Space) {
-                // change the style of the current Run that we are under to be the default text style
-                var pos = MainRepl.CaretPosition;
-                var run = pos.Parent as Run;
-                var style = (Style)Application.Current.FindResource("None");
-                if (run != null) {
-                    run.Style = style;
-                }
+                args.Handled = true;
+            } else if (args.IsCtrl(Key.Return)) {
+                RunCurrentLine();
+                args.Handled = true;
+            } else if (args.IsCtrl(Key.Space)) {
+                ChangeRunUnderCursorToDefaultTextStyle();
+                args.Handled = true;
             }
+        }
+
+        private void InsertSmartLineBreak() {
+            var position = MainRepl.CaretPosition;
+            if (!position.IsAtLineStartPosition) {
+                var pos = MainRepl.CaretPosition.InsertLineBreak();
+                MainRepl.CaretPosition = pos.GetNextContextPosition(LogicalDirection.Forward);
+            } else {
+                // remove the last line break in the paragraph's inlines collection
+                var current_run = GetRunUnderPosition(position);
+                var last_line_break = current_run.PreviousInline;
+                MainRepl.CaretPosition.Paragraph.Inlines.Remove(last_line_break);
+                var pos2 = MainRepl.CaretPosition.InsertParagraphBreak();
+                MainRepl.CaretPosition = pos2.GetNextContextPosition(LogicalDirection.Forward);
+            }
+        }
+
+        private Inline RunSelection(TextRange selection) {
+            try {
+                var code = selection.Text;
+                var run1 = ColorizeSelection(selection);
+                var run2 = InsertLineBreak(run1);
+                var run3 = RenderOutput(run2, Execute(code));
+                var run4 = InsertLineBreak(run3);
+                var run5 = InsertInline(run4, new Run(String.Empty));
+                selection.Text = String.Empty;
+                MainRepl.CaretPosition = run5.ElementStart;
+                return run5;
+            } catch (Exception e) {
+                return RenderError(GetRunUnderPosition(MainRepl.Selection.End), e.Message);
+            } 
+        }
+
+        private Inline RunCurrentLine() {
+            var selection = new TextRange(MainRepl.CaretPosition.GetLineStartPosition(0), MainRepl.CaretPosition);
+            return RunSelection(selection);
+        }
+
+        private void ChangeRunUnderCursorToDefaultTextStyle() {
+            var run = GetRunUnderPosition(MainRepl.CaretPosition);
+            run.Style = (Style)Application.Current.FindResource("None");
+        }
+
+        public void AddExternalObject(string name, object obj) {
+            CurrentEngine.SetVariable(name, obj);
         }
     }
 
