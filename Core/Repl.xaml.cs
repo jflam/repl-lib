@@ -200,7 +200,7 @@ namespace Core {
 
         private Inline RunCurrentLine() {
             var selection = new TextRange(MainRepl.CaretPosition.GetLineStartPosition(0), MainRepl.CaretPosition);
-            return RunSelection(selection);
+            return selection.IsEmpty ? null : RunSelection(selection);
         }
 
         private void ChangeRunUnderCursorToDefaultTextStyle() {
