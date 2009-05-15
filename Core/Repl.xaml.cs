@@ -183,6 +183,9 @@ namespace Core {
         }
 
         private Inline RunSelection(TextRange selection) {
+            if (selection.IsEmpty)
+                return GetInlineUnderPosition(selection.Start);
+
             try {
                 var code = selection.Text;
                 var run1 = ColorizeSelection(selection);
@@ -200,7 +203,7 @@ namespace Core {
 
         private Inline RunCurrentLine() {
             var selection = new TextRange(MainRepl.CaretPosition.GetLineStartPosition(0), MainRepl.CaretPosition);
-            return selection.IsEmpty ? null : RunSelection(selection);
+            return RunSelection(selection);
         }
 
         private void ChangeRunUnderCursorToDefaultTextStyle() {

@@ -9,6 +9,12 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <RichTextBox Name="MainRepl" Style="{DynamicResource TextStyle}" PreviewKeyDown="MainRepl_PreviewKeyDown" Grid.Row="0" />
+        <RichTextBox Name="MainRepl" Style="{DynamicResource TextStyle}" PreviewKeyDown="MainRepl_PreviewKeyDown" Grid.Row="0">
+            <FlowDocument>
+                <Paragraph>
+                    <Run />
+                </Paragraph>
+            </FlowDocument>
+        </RichTextBox>
     </Grid>
 </UserControl>
