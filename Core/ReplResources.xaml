@@ -1,0 +1,49 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Style x:Key="NumericLiteral">
+        <Setter Property="Control.Foreground" Value="#FFEE98" />
+    </Style>
+    <Style x:Key="Keyword">
+        <Setter Property="Control.Foreground" Value="#FF6600" />
+    </Style>
+    <Style x:Key="Identifier">
+        <Setter Property="Control.Foreground" Value="#FFCC00" />
+    </Style>
+    <Style x:Key="StringLiteral">
+        <Setter Property="Control.Foreground" Value="#66FF00" />
+    </Style>
+    <Style x:Key="Comment">
+        <Setter Property="Control.Foreground" Value="#9933CC" />
+    </Style>
+    <Style x:Key="Error">
+        <Setter Property="Control.Foreground" Value="#FF0000" />
+    </Style>
+    <Style x:Key="None">
+        <Setter Property="Control.Foreground" Value="#FFFFFF" />
+    </Style>
+    <Style x:Key="TextStyle">
+        <Setter Property="Control.FontFamily" Value="Consolas" />
+        <Setter Property="Control.Foreground" Value="White" />
+        <Setter Property="Control.Background" Value="Black" />
+        <Setter Property="Control.FontSize" Value="20" />
+    </Style>
+    <Style x:Key="WindowStyle">
+        <Setter Property="Control.Background" Value="Black" />
+        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Hidden" />
+    </Style>
+    <Style TargetType="{x:Type ListBoxItem}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ListBoxItem}">
+                    <TextBlock Name="TheBGControl"><ContentPresenter /></TextBlock>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Foreground" Value="Black" TargetName="TheBGControl" />
+                            <Setter Property="Background" Value="Yellow" TargetName="TheBGControl" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+</ResourceDictionary>

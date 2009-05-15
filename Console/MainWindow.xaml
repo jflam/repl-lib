@@ -1,0 +1,9 @@
+﻿<Window x:Class="Console.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:core="clr-namespace:Core;assembly=Core"
+    Title="MainWindow" Height="700" Width="900">
+    <Grid>
+        <core:Repl Name="MainRepl"/>
+    </Grid>
+</Window>
