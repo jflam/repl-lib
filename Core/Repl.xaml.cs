@@ -150,8 +150,11 @@ namespace Core {
             if (args.IsCtrl(Key.E)) {
                 RunSelection(MainRepl.Selection);
                 args.Handled = true;
-            } else if (Keyboard.Modifiers == ModifierKeys.None && args.Key == Key.Return) {
+            } else if (args.Is(Key.Return)) {
                 InsertSmartLineBreak();
+                args.Handled = true;
+            } else if (args.Is(Key.Tab)) {
+                MainRepl.CaretPosition.InsertTextInRun("  ");
                 args.Handled = true;
             } else if (args.IsCtrl(Key.S)) {
                 SaveDocument();
@@ -221,6 +224,11 @@ namespace Core {
         public static bool IsCtrlShift(this KeyEventArgs keyEvent, Key value) {
             return keyEvent.KeyboardDevice.Modifiers == ModifierKeys.Control
                 && keyEvent.KeyboardDevice.Modifiers == ModifierKeys.Shift
+                && keyEvent.Key == value;
+        }
+
+        public static bool Is(this KeyEventArgs keyEvent, Key value) {
+            return keyEvent.KeyboardDevice.Modifiers == ModifierKeys.None
                 && keyEvent.Key == value;
         }
     }
