@@ -68,27 +68,6 @@ namespace Core {
 
         #endregion 
 
-        #region deprecated code
-
-        //private void InsertTextBlock(List<Run> runs) {
-        //    var block = new TextBlock();
-        //    block.Inlines.AddRange(runs);
-
-        //    var pos = MainRepl.CaretPosition.Paragraph;
-        //    pos.Inlines.Add(new LineBreak());
-        //    pos.Inlines.AddRange(runs);
-        //}
-
-        //private void RenderInput(string code) {
-        //    var pos = MainRepl.CaretPosition.Paragraph;
-        //    var selected_text = MainRepl.Selection.Text;
-        //    MainRepl.Selection.Text = String.Empty;
-        //    var blocks = Colorizer.Colorize(CurrentEngine, code, null);
-        //    pos.Inlines.AddRange(blocks);
-        //}
-
-        #endregion
-
         private object Execute(string code) {
             if (code.StartsWith("%")) {
                 var pos = code.IndexOf('%');
