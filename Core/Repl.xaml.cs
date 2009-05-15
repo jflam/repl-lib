@@ -96,8 +96,7 @@ namespace Core {
                 if (_languageMap.ContainsKey(language)) {
                     _currentEngine = language;
                 } else {
-                    // TODO: throw from here - not the right place to side-effect
-                    //RenderOutput("uh oh - don't know that language");
+                    throw new ApplicationException("Unknown language requested: " + language);
                 }
                 return "Switched to " + language;
             } else {
@@ -105,15 +104,15 @@ namespace Core {
             }
         }
 
-        private Run GetRunUnderPosition(TextPointer position) {
-            var result = position.Parent as Run;
+        private Inline GetInlineUnderPosition(TextPointer position) {
+            var result = position.Parent as Inline;
             if (result == null)
-                throw new ApplicationException("text pointer is not pointing to a Run??!!");
+                throw new ApplicationException("text pointer is not pointing to an Inline??!!");
             return result;
         }
 
-        private Paragraph GetParagraph(Inline run) {
-            var paragraph = run.Parent as Paragraph;
+        private Paragraph GetParagraph(Inline position) {
+            var paragraph = position.Parent as Paragraph;
             if (paragraph == null)
                 throw new ApplicationException("is it possible for a Run to not have a Paragraph as a perent??");
             return paragraph;
@@ -138,16 +137,16 @@ namespace Core {
             return end;
         }
 
-        private Inline InsertColorizedCode(Inline run, string code) {
-            return InsertElements(run, Colorizer.Colorize(CurrentEngine, code, null));
+        private Inline InsertColorizedCode(Inline position, string code) {
+            return InsertElements(position, Colorizer.Colorize(CurrentEngine, code, null));
         }
 
-        private Inline RenderError(Inline run, string error) {
-            return InsertElements(run, Colorizer.ColorizeErrors(error));
+        private Inline RenderError(Inline position, string error) {
+            return InsertElements(position, Colorizer.ColorizeErrors(error));
         }
 
         private Inline ColorizeSelection(TextRange selection) {
-            var position = GetRunUnderPosition(selection.End);
+            var position = GetInlineUnderPosition(selection.End);
             var code = selection.Text;
             return InsertColorizedCode(position, code);
         }
@@ -176,9 +175,7 @@ namespace Core {
                 InsertSmartLineBreak();
                 args.Handled = true;
             } else if (args.IsCtrl(Key.S)) {
-                using (var stream = File.OpenWrite(@"c:\temp\output.xml")) {
-                    XamlWriter.Save(MainRepl.Document, stream);
-                }
+                SaveDocument();
                 args.Handled = true;
             } else if (args.IsCtrl(Key.Return)) {
                 RunCurrentLine();
@@ -189,19 +186,18 @@ namespace Core {
             }
         }
 
-        private void InsertSmartLineBreak() {
-            var position = MainRepl.CaretPosition;
-            if (!position.IsAtLineStartPosition) {
-                var pos = MainRepl.CaretPosition.InsertLineBreak();
-                MainRepl.CaretPosition = pos.GetNextContextPosition(LogicalDirection.Forward);
-            } else {
-                // remove the last line break in the paragraph's inlines collection
-                var current_run = GetRunUnderPosition(position);
-                var last_line_break = current_run.PreviousInline;
-                MainRepl.CaretPosition.Paragraph.Inlines.Remove(last_line_break);
-                var pos2 = MainRepl.CaretPosition.InsertParagraphBreak();
-                MainRepl.CaretPosition = pos2.GetNextContextPosition(LogicalDirection.Forward);
+        private void SaveDocument() {
+            using (var stream = File.OpenWrite(@"c:\temp\output.xml")) {
+                XamlWriter.Save(MainRepl.Document, stream);
             }
+        }
+
+        private Inline InsertSmartLineBreak() {
+            var position = GetInlineUnderPosition(MainRepl.CaretPosition);
+            var run1 = InsertLineBreak(position);
+            var run2 = InsertInline(run1, new Run(String.Empty));
+            MainRepl.CaretPosition = run2.ElementStart;
+            return run2;
         }
 
         private Inline RunSelection(TextRange selection) {
@@ -216,7 +212,7 @@ namespace Core {
                 MainRepl.CaretPosition = run5.ElementStart;
                 return run5;
             } catch (Exception e) {
-                return RenderError(GetRunUnderPosition(MainRepl.Selection.End), e.Message);
+                return RenderError(GetInlineUnderPosition(MainRepl.Selection.End), e.Message);
             } 
         }
 
@@ -226,7 +222,7 @@ namespace Core {
         }
 
         private void ChangeRunUnderCursorToDefaultTextStyle() {
-            var run = GetRunUnderPosition(MainRepl.CaretPosition);
+            var run = GetInlineUnderPosition(MainRepl.CaretPosition);
             run.Style = (Style)Application.Current.FindResource("None");
         }
 
