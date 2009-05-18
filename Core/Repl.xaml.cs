@@ -1,16 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Markup;
-using System.Xml;
 using IronRuby.Builtins;
 
 namespace Core {
     public partial class Repl : UserControl {
+        public const string RESOURCE_FILENAME = "ReplResources.xaml";
+        public const string DEFAULT_VIEWER = "default.viewer.rb";
+
         private Dictionary<Type, bool> _viewers = new Dictionary<Type, bool>();
         private Dictionary<string, DlrEngine> _languageMap = new Dictionary<string, DlrEngine>();
         private string _currentEngine;
@@ -30,14 +33,36 @@ namespace Core {
         #region Component initialization 
 
         private void LoadResources() {
-            // TODO: load embedded ReplResources.xaml and write to disk if we don't have one in our current dir
-            var resourceDictionary = (ResourceDictionary)XamlReader.Load(XmlReader.Create("ReplResources.xaml"));
-            Application.Current.Resources.MergedDictionaries.Add(resourceDictionary);
+            using (var stream = ReplResourceManager.Load(RESOURCE_FILENAME)) {
+                var resourceDictionary = (ResourceDictionary)XamlReader.Load(stream);
+                Application.Current.Resources.MergedDictionaries.Add(resourceDictionary);
+            }
         }
 
         private void InitializePlugins() {
-            // TODO: remove hard-coded path
-            CurrentEngine.Require(@"c:\teched\repl\Viewers\default.viewer.rb");
+            // TODO: generalize and refactor this
+            var path = Environment.GetEnvironmentVariable("REPL_PLUGINS");
+            if (path == null) {
+                var home = Environment.GetEnvironmentVariable("HOME");
+                var homeDrive = Environment.GetEnvironmentVariable("HOMEDRIVE");
+                path = homeDrive + home;
+                path = Path.Combine(path, "ReplPlugins");
+            }
+
+            var viewerPath = Path.Combine(path, DEFAULT_VIEWER);
+            if (Directory.Exists(path) && File.Exists(viewerPath)) {
+                CurrentEngine.Require(viewerPath);
+            } else {
+                Directory.CreateDirectory(path);
+                var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("Core." + DEFAULT_VIEWER);
+                var length = (int)stream.Length;
+                using (var outputStream = File.OpenWrite(viewerPath)) {
+                    var buffer = new byte[length];
+                    stream.Read(buffer, 0, length);
+                    outputStream.Write(buffer, 0, length);
+                }
+                CurrentEngine.Require(viewerPath);
+            }
         }
 
         private void InitializeScriptEngines() {
